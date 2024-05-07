@@ -25,8 +25,9 @@ treatment_choices = [
     "Need an emergency visit"
 ]
 
-
+# Initialize global notes variables
 trigger_notes = ""
+treatment_notes = ""  # Added initialization for treatment notes
 
 def init_db():
     conn = sqlite3.connect('ibd_symptoms.db')
@@ -55,7 +56,6 @@ def init_db():
 def save_to_database(form_data):
     conn = sqlite3.connect('ibd_symptoms.db')
     cursor = conn.cursor()
-    # Ensure the number of placeholders matches the number of items in form_data
     cursor.execute('''
         INSERT INTO symptoms (
             pain_level, urgency, visits, bristol_scale, blood_presence,
@@ -65,9 +65,9 @@ def save_to_database(form_data):
     conn.commit()
     conn.close()
 
-# GUI Setup
 app = tk.Tk()
 app.title("IBD Symptom Tracker")
+
 def log_symptoms_to_csv(form_data):
     now = datetime.datetime.now()
     timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
@@ -81,20 +81,17 @@ def log_symptoms_to_csv(form_data):
         writer.writerow(form_data_with_timestamp)
 
 def ask_triggers_window(callback):
-    global notes_entry  # Declare as global to ensure it can be accessed in nested functions
-
     def submit_triggers():
-        global trigger_notes, treatment_notes, user_notes
         selected_triggers = [key for key, var in trigger_checkboxes.items() if var.get()]
+        global trigger_notes, treatment_notes  # Ensure they are recognized as global variables
         trigger_notes = ', '.join(selected_triggers) if selected_triggers else "NULL"
         selected_treatments = [option for option, var in treatment_checkboxes.items() if var.get()]
         treatment_notes = ', '.join(selected_treatments) if selected_treatments else "NULL"
-        user_notes = notes_entry.get("1.0", tk.END).strip() or "NULL"
         window.destroy()
         callback()
 
     window = Toplevel(app)
-    window.title("Select Triggers, Treatments, and Provide Notes")
+    window.title("Select Triggers and Treatments")
 
     ttk.Label(window, text="Please select the potential triggers:").grid(row=0, column=0, columnspan=2, pady=5)
     trigger_checkboxes = {}
@@ -111,21 +108,16 @@ def ask_triggers_window(callback):
         treatment_checkboxes[treatment] = var
         ttk.Checkbutton(window, text=treatment, variable=var).grid(row=index2, column=0, sticky=tk.W, padx=10)
 
-    # Notes section
-    ttk.Label(window, text="Provide any additional notes:").grid(row=index2 + 1, column=0, pady=5)
-    notes_entry = tk.Text(window, height=4, width=40)
-    notes_entry.grid(row=index2 + 2, column=0, padx=10)
-
-    ttk.Button(window, text="Submit", command=submit_triggers).grid(row=index2 + 3, column=0, pady=10)
-
+    ttk.Button(window, text="Submit", command=submit_triggers).grid(row=index2 + 1, column=0, pady=10)
 
 def process_submission(form_data):
-    form_data.extend([trigger_notes, treatment_notes, user_notes])
+    form_data.extend([trigger_notes, treatment_notes])
     if not validate_form_data(form_data):
         return
     save_to_database(form_data)
     log_symptoms_to_csv(form_data)
     messagebox.showinfo("Success", "Symptoms submitted and logged successfully!")
+
 def submit():
     try:
         form_data = [
@@ -180,9 +172,18 @@ visits = ttk.Combobox(app, values=["Normal", "1-2 more than normal", "3-4 more t
 visits.grid(row=2, column=1, pady=2, padx=2)
 ttk.Label(app, text="Number of bathroom visits:").grid(row=2, column=0, sticky=tk.W)
 
-bristol_scale = ttk.Combobox(app, values=list(range(1, 8)))
+bristol_scale = ttk.Combobox(app, values=[
+    "1 - Separate hard lumps, like nuts (hard to pass)",
+    "2 - Sausage-shaped but lumpy",
+    "3 - Like a sausage but with cracks on the surface",
+    "4 - Like a sausage or snake, smooth and soft",
+    "5 - Soft blobs with clear-cut edges (passed easily)",
+    "6 - Fluffy pieces with ragged edges, a mushy stool",
+    "7 - Watery, no solid pieces (entirely liquid)"
+])
 bristol_scale.grid(row=3, column=1, pady=2, padx=2)
 ttk.Label(app, text="Stool condition (Bristol Scale):").grid(row=3, column=0, sticky=tk.W)
+
 
 blood_presence = ttk.Combobox(app, values=["No", "Yes"])
 blood_presence.grid(row=4, column=1, pady=2, padx=2)
